@@ -1,0 +1,70 @@
+<style>
+
+body {
+  font-size: 14px;
+}
+ul.a {
+ font-size: 12px;
+ margin: 0px 0px;
+}
+td {  /* Table  */
+  font-size: 12px;
+}
+h1.title {
+  font-size: 26px;
+  color: DarkRed;
+}
+h1 { /* Header 1 */
+  font-size: 26px;
+  color: DarkBlue;
+}
+h2 { /* Header 2 */
+    font-size: 24px;
+  color: DarkBlue;
+}
+h3 { /* Header 3 */
+  font-size: 22px;
+  color: DarkBlue;
+}
+code.r{ /* Code block */
+    font-size: small;
+}
+pre { /* Code block - determines code spacing between lines */
+    font-size: 2px;
+}
+
+</style>
+
+
+<script>
+
+	aside.gdbar img {
+	  width: 200px;
+	  height: 134px;
+	  position: absolute;
+	  right: 0;
+	  margin: 20px 20px;
+	}
+    
+	
+	.gdbar img {
+        width: 200px !important;
+        height: 134px !important;
+		margin: 20px 20px;
+    }
+
+    .gdbar {
+        width: 300px !important;
+        height: 167px !important;
+		margin: 20px 20px;
+    }
+
+    slides > slide:not(.nobackground):before {
+        width: 75px;
+        height: 50px;
+        background-size: 75px 50px;
+    }
+	
+</script>
+
+

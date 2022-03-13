@@ -1,0 +1,13 @@
+name: WordPredictor
+title: WordPredictor
+username:
+account: angusmac-rsa
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 5843694
+bundleId: 5678756
+url: https://angusmac-rsa.shinyapps.io/WordPredictor/
+when: 1647210343.59456
+lastSyncTime: 1647210343.59456
+asMultiple: FALSE
+asStatic: FALSE

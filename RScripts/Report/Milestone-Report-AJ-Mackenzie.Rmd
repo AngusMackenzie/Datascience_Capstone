@@ -1,0 +1,240 @@
+---
+title: "Data Science Capstone:<br>Milestone Report"
+author: "Angus Mackenzie"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  ioslides_presentation:
+    widescreen: true
+    css: my.css
+    logo: nlp_icon.png
+    smaller: yes
+---
+
+
+```{r setup, include=FALSE, echo=FALSE}
+#### Setup
+library(tidyverse);library(kableExtra);library(formattable);library(colorspace)
+library(ggdist);library(ggtext);library(ggrepel)
+
+
+## Functions
+space <- function(x, ...) {format(x, ..., big.mark = ",", scientific = FALSE, trim = TRUE)}
+
+spaceK <- function(x) {
+  case_when(x >= 10^9 ~ paste0(format(round(x/10^9, 1), big.mark = " ", scientific = FALSE, trim = TRUE), "B"),
+            x < 10^9 & x >= 10^6 ~ paste0(format(round(x/10^6, 1), big.mark = " ", scientific = FALSE, trim = TRUE), "M"),
+            x < 10^6 & x >= 10^3 ~ paste0(format(round(x/10^3,1), big.mark = " ", scientific = FALSE, trim = TRUE), "K"),
+            TRUE ~ as.character(round(x,1)))
+}
+
+my_sng_bar <- function(x, icol = NULL) {
+  range <- max(abs(x), na.rm = TRUE)
+  width <- c(round(abs(x / range * 100), 2))
+  ifelse(is.na(x), 0, paste0(
+    '<span style="display: inline-block; border-radius: 2px; ', 
+    'padding-right: 0px; background-color:', icol, '; width: ', 
+    width, '%; margin-left: 0%; text-align: left;">', space(x), '</span>'
+  ))
+}
+
+## Colours
+col_bg <- "#222d32";col_fg <- "#3C8DBC";col_ct <- '#024788'
+col_ml <- '#E66100';col_fc <- '#5D3A9B';col_ln <- "#748696"
+
+## Text type
+vtxt <- c("blogs", "news", "twitter")
+
+vcol_typ <- c('#5A8F5A', '#877C97', '#B36E6D')
+vcol_typd <- darken(vcol_typ, 0.5); vcol_typl <- lighten(vcol_typ, 0.5, method = 'relative')
+    names(vcol_typ) <- vtxt; names(vcol_typd) <- vtxt; names(vcol_typl) <- vtxt
+
+## Directory
+myDir <- paste0(getwd(), "/")
+    myDir <- sub("RScripts.*", "", myDir)
+        myDat <- paste0(myDir,"Data/")
+
+## Map
+ldata <- readRDS(paste0(myDat, "Processed_English.rds"))
+
+```
+
+##
+### Predictive Text Model
+Typing on mobile devices is hard without a full keyboard - now that Blackberry has discontinued support for its devices. To make things easier we'll build a model that will predict what word a user is going to type. This report will detail exploratory data analysis of the text corpus that will be used to create this model. I will show:
+
+* The sampling of the data,
+* Frequency of words, 2-grams and 3-grams,
+* How many words are in 50% and 90% of the data,
+* How I plan to deal with words that don't appear in the corpora. 
+
+
+
+##
+### Data Import 
+I downloaded the data and read it into R using the read_lines function from the "readr" package as it has the ability to special characters not in UTF-8 text format. It was filtered for English only, cleaned and arranged into a single data frame that came to approximately 4.3 million rows.
+
+
+### Sampling
+I tried to analyse the whole corpus but even with parallel processing it was taking too long so I decided to take a total sample of 200K rows. As I wanted the number of words to be roughly equal for each text source, and there was great variation of average words per row for the different text sources, the number of rows sampled for each source differed:
+
+<br>
+
+```{r sampling, out.width="60%", echo=FALSE}
+
+ldata$text_sample %>% group_by(type) %>% summarise(lines = n()) %>%
+  mutate(lines = my_sng_bar(lines, icol = vcol_typl[match(type, names(vcol_typl))]) ) %>%
+  kable(., "html", escape = FALSE, table.attr = "style='width:60%;font-size: 16px;'", col.names = c(
+    "Text Source", "Lines of Text" )) %>% kable_styling(full_width = TRUE) %>%
+  column_spec(1, width = 400, color = "black", extra_css = 'padding: 2px 2px 2px 2px;') %>%
+  column_spec(2, width = 500, color = "black", bold = TRUE, extra_css = 'text-align:left; padding: 2px 2px 2px 2px;') %>%
+  row_spec(0, color = 'white', background = col_bg, bold = TRUE, font_size = 16,
+           extra_css = 'padding: 3px 3px 3px 3px;') %>%
+  row_spec(1:3, font_size = 14, extra_css = 'border-bottom-style: dashed; border-bottom-color:
+           #92a8d1;border-bottom-width: thin;')
+
+
+```
+
+##
+### Data
+The sample was separated by words to find the frequency they were repeated. Here is the total different number of words per source, how many different words make up 90% and 50% of all words per source:
+
+```{r count, echo=FALSE}
+
+## Count
+ldata$word_freq %>% group_by(type) %>%
+  summarise(wall = n(), w90 = sum(ntot <= 0.9), w50 = sum(ntot <= 0.5)) %>%
+  mutate(wall = my_sng_bar(wall, icol = vcol_typl[match(type, names(vcol_typl))]),
+         w90 = my_sng_bar(w90, icol = vcol_typl[match(type, names(vcol_typl))]) ,
+         w50 = my_sng_bar(w50, icol = vcol_typl[match(type, names(vcol_typl))]) ) %>%
+  kable(., "html", escape = FALSE, table.attr = "style='width:100%;font-size: 16px;'", col.names = c(
+    "Text Source", "All Words", "90% of Words", "50% of Words" )) %>% kable_styling(full_width = TRUE) %>%
+  column_spec(1, width = 400, color = "black", extra_css = 'padding: 2px 2px 2px 2px;') %>%
+  column_spec(2:4, width = 500, color = "black", bold = TRUE, extra_css = 'text-align:left; padding: 2px 2px 2px 2px;') %>%
+  row_spec(0, color = 'white', background = col_bg, bold = TRUE, font_size = 16,
+           extra_css = 'padding: 3px 3px 3px 3px;') %>%
+  row_spec(1:3, font_size = 14, extra_css = 'border-bottom-style: dashed; border-bottom-color:
+           #92a8d1;border-bottom-width: thin;')
+
+
+```
+
+<br>
+And here are the top ten repeated words per source:
+
+```{r frew, echo=FALSE}
+
+## Frequency
+ldata$word_freq %>% select(-ntot) %>% group_by(type) %>% 
+  mutate(nrank = dense_rank(desc(ncnt))) %>% filter(nrank <= 10) %>%
+  pivot_wider(id_cols = nrank, names_from = type, values_from = c(word, ncnt)) %>%
+  select(nrank, word_news, ncnt_news, word_blogs, ncnt_blogs, word_twitter, ncnt_twitter) %>%
+  mutate(nrank = case_when(nrank == 1 ~ "1st", nrank == 2 ~ "2nd", nrank == 3 ~ "3rd",
+                           TRUE ~ paste0(nrank, "th")),
+         ncnt_news = my_sng_bar(ncnt_news, icol = vcol_typl[names(vcol_typl) == "news"]),
+         ncnt_blogs = my_sng_bar(ncnt_blogs, icol = vcol_typl[names(vcol_typl) == "blogs"]) ,
+         ncnt_twitter = my_sng_bar(ncnt_twitter, icol = vcol_typl[names(vcol_typl) == "twitter"]) ) %>%
+  kable(., "html", escape = FALSE, table.attr = "style='width:100%;font-size: 16px;'", col.names = c(
+    "Rank", "Word", "Frequency", "Word", "Frequency", "Word", "Frequency")) %>%
+  add_header_above(c(" " = 1, "News" = 2, "Blogs" = 2, "Twitter" = 2), 
+                   align = 'c', extra_css = "border-left:2px solid lightgrey;border-right:2px solid lightgrey;") %>%
+  column_spec(1, width = 400, color = "black", extra_css = 'padding: 2px 2px 2px 2px;') %>%
+  column_spec(2:7, width = 500, color = "black", bold = TRUE, extra_css = 'text-align:left; padding: 2px 2px 2px 2px;') %>%
+  row_spec(0, color = 'white', background = col_bg, bold = TRUE, font_size = 16,
+           extra_css = 'padding: 3px 3px 3px 3px;') %>%
+  row_spec(1:10, font_size = 14, extra_css = 'border-bottom-style: dashed; border-bottom-color:
+           #92a8d1;border-bottom-width: thin;')
+
+
+```
+
+
+## 
+### Words used in lines
+I then checked for words that are used in many different lines, opposed to being repeated often in lines. This isn't a great problem, below is this graphed for the 50% words:
+
+```{r analysis, fig.align='center', echo=FALSE}
+
+## Repetition
+dfrlab <- ldata$word_50 %>% group_by(type) %>% top_n(10, ntms) %>%
+  mutate(lab_c = vcol_typd[match(type, names(vcol_typd))])
+
+ldata$word_50 %>% ggplot(aes(x = ncnt, y = ntms, color = type, fill = type)) +
+  geom_point() + geom_smooth(formula = "y ~ x", method = "loess") + 
+  geom_label_repel(data = dfrlab, aes(label = word), show.legend = FALSE, label.padding = unit(0.15, "lines"),
+                   size = 3, color = dfrlab$lab_c) +
+  scale_color_manual(values = vcol_typ) + scale_fill_manual(values = alpha(vcol_typ, 0.5)) + 
+  scale_x_continuous(labels = spaceK) + scale_y_continuous(labels = spaceK) +
+  labs(x = "Times word is repeated", y = "Lines containing word") +
+  theme_bw() + theme(
+    legend.title = element_blank(), legend.position = c(0.075, 0.875), 
+    legend.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "transparent"))
+
+
+```
+
+##
+### N-Grams
+I then extracted the bigrams and trigrams per text source, found their frequency and filtered so that they only included words in the top 90%.
+
+```{r n_gram, echo=FALSE}
+
+## Data
+dfngram <- ldata$bigram %>% group_by(type) %>% mutate(iwrd = "bigram", nrank = dense_rank(desc(ncnt))) %>% 
+  rename(ngram = bigram) %>% filter(nrank <= 5 & !duplicated(nrank)) %>%
+  select(type, nrank, iwrd, ngram, ncnt) %>% bind_rows(
+    ldata$trigam %>% group_by(type) %>% mutate(iwrd = "trigram", nrank = dense_rank(desc(ncnt))) %>%
+      rename(ngram = trigram) %>% filter(nrank <= 5 & !duplicated(nrank)) %>%
+      select(type, nrank, iwrd, ngram, ncnt) 
+  )
+
+## Pivot
+dfpivot <- dfngram %>% pivot_wider(id_cols = c(type, nrank), names_from = iwrd, values_from = c(ngram, ncnt)) %>%
+  ungroup()
+
+## Table
+dfpivot %>% select(type, nrank, ngram_bigram, ncnt_bigram, ngram_trigram, ncnt_trigram) %>% arrange(type, nrank) %>%
+  mutate(nrank = case_when(nrank == 1 ~ "1st", nrank == 2 ~ "2nd", nrank == 3 ~ "3rd", TRUE ~ paste0(nrank, "th")),
+         ncnt_bigram = my_sng_bar(ncnt_bigram, icol = vcol_typl[match(type, names(vcol_typl))]),
+         ncnt_trigram = my_sng_bar(ncnt_trigram, icol = vcol_typl[match(type, names(vcol_typl))]),
+         type = text_spec(type, angle = -90)) %>%
+  kable(., "html", escape = FALSE, table.attr = "style='width:100%;font-size: 16px;'", col.names = c(
+    "Type", "Rank", "Bigram", "Frequency", "Trigram", "Frequency")) %>%
+  column_spec(1, width = 25, color = "black", bold = TRUE) %>%
+  column_spec(2, width = 50, color = "black", extra_css = 'padding: 2px 2px 2px 2px;') %>%
+  column_spec(3:6, width = 500, color = "black", bold = TRUE, extra_css = 'text-align:left; padding: 2px 2px 2px 2px;') %>%
+  collapse_rows(columns = 1, valign = "middle", row_group_label_position = "identity") %>%
+  row_spec(0, color = 'white', background = col_bg, bold = TRUE, font_size = 16,
+           extra_css = 'padding: 3px 3px 3px 3px;') %>%
+  row_spec(1:15, font_size = 14, extra_css = 'border-bottom-style: dashed; border-bottom-color:
+           #92a8d1;border-bottom-width: thin;')
+
+
+```
+
+##
+### Model Strategy
+
+The next step is to create a model that will be accessed through a Shiny App. The model will:
+
+* Predict the next word via n-gram tokenisation.
+* Reduce words used to speed up processing.
+* Attempt to predict unseen sequences of words.
+
+
+<br>
+<div class="centered">
+<font size="7">
+**Thank you for grading my submission!** 
+</font>
+<br>
+
+</div>
+
+
+
+
+
+
+
